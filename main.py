@@ -1,162 +1,141 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request
 import requests
 
 app = Flask(__name__)
 
-@app.route("/")
-def ana_sayfa():
-    # Canlı Döviz Verileri
-    url = "https://open.er-api.com/v6/latest/USD"
-    usd_try, eur_try, gbp_try = 32.50, 35.20, 41.10
-    
+def kurlari_al():
     try:
-        response = requests.get(url)
+        # Piyasa canlı kurlarını çeken API
+        response = requests.get("https://api.genelpara.com/embed/doviz.json")
         data = response.json()
-        rates = data["rates"]
-        try_rate = rates["TRY"]
-        usd_try = round(try_rate, 2)
-        eur_try = round(try_rate / rates["EUR"], 2)
-        gbp_try = round(try_rate / rates["GBP"], 2)
+        
+        # Altın verilerini de alalım
+        gold_response = requests.get("https://api.genelpara.com/embed/altin.json")
+        gold_data = gold_response.json()
+
+        dolar = float(data['USD']['satis'].replace(',', '.'))
+        euro = float(data['EUR']['satis'].replace(',', '.'))
+        altin = float(gold_data['GA']['satis'].replace(',', '.'))
+
+        return {
+            'USD': dolar,
+            'EUR': euro,
+            'GA': altin
+        }
     except Exception as e:
-        print("Döviz çekme hatası:", e)
+        # Herhangi bir hata durumunda varsayılan kurlar
+        return {'USD': 34.20, 'EUR': 37.50, 'GA': 2850.0}
 
-    # Tahmini Canlı Altın Hesaplaması (Ons Fiyatı Üzerinden Gram Altın)
-    # Ons ~ 2350 USD varsayımı ile Gram Altın TL hesabı
-    gram_altin = round((2350 / 31.1035) * usd_try, 2)
-    ceyrek_altin = round(gram_altin * 1.63, 2)
-
-    html_kod = f"""
-    <!DOCTYPE html>
-    <html lang="tr">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Canlı Finans & Altın Portalı</title>
-        <!-- Chart.js Kütüphanesi -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <style>
-            * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-            body {{
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                background-color: #0f172a;
-                color: white;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                padding: 20px;
-            }}
-            .container {{
-                background-color: #1e293b;
-                padding: 30px;
-                border-radius: 16px;
-                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-                width: 100%;
-                max-width: 480px;
-            }}
-            h1 {{
-                color: #38bdf8;
-                font-size: 22px;
-                text-align: center;
-                margin-bottom: 20px;
-            }}
-            .kur-grid {{
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-                margin-bottom: 20px;
-            }}
-            .kur-kart {{
-                background: #334155;
-                padding: 12px;
-                border-radius: 10px;
-                text-align: center;
-            }}
-            .kur-kart .baslik {{ font-size: 14px; color: #94a3b8; margin-bottom: 5px; }}
-            .kur-kart .deger {{ font-size: 18px; font-weight: bold; color: #4ade80; }}
-            .altin-kart {{ color: #facc15 !important; }}
-            
-            /* Grafik Alanı */
-            .grafik-kutusu {{
-                background: #0f172a;
-                padding: 15px;
-                border-radius: 12px;
-                margin-top: 20px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🚀 Canlı Finans & Altın Portalı</h1>
-            
-            <!-- Döviz ve Altın Kartları -->
-            <div class="kur-grid">
-                <div class="kur-kart">
-                    <div class="baslik">🇺🇸 Dolar (USD)</div>
-                    <div class="deger">{usd_try} TL</div>
-                </div>
-                <div class="kur-kart">
-                    <div class="baslik">🇪🇺 Euro (EUR)</div>
-                    <div class="deger">{eur_try} TL</div>
-                </div>
-                <div class="kur-kart">
-                    <div class="baslik">👑 Gram Altın</div>
-                    <div class="deger altin-kart">{gram_altin} TL</div>
-                </div>
-                <div class="kur-kart">
-                    <div class="baslik">🪙 Çeyrek Altın</div>
-                    <div class="deger altin-kart">{ceyrek_altin} TL</div>
-                </div>
+HTML_KODU = """
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finans Portal & Portföy Takibi</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { text-align: center; color: #00e676; margin-bottom: 30px; }
+        .cards { display: flex; gap: 20px; justify-content: space-between; margin-bottom: 30px; flex-wrap: wrap; }
+        .card { background: #1e1e1e; border-radius: 12px; padding: 20px; flex: 1; min-width: 200px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-align: center; }
+        .card h3 { margin: 0; color: #a0a0a0; }
+        .card .price { font-size: 28px; font-weight: bold; margin: 10px 0; color: #00e676; }
+        .portfolio-section { background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 30px; }
+        .form-group { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        input, select, button { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 16px; }
+        input { flex: 1; min-width: 150px; }
+        button { background: #00e676; color: #121212; font-weight: bold; cursor: pointer; border: none; }
+        button:hover { background: #00c853; }
+        .result-box { background: #2a2a2a; padding: 20px; border-radius: 8px; margin-top: 20px; font-size: 18px; }
+        .profit { color: #00e676; font-weight: bold; }
+        .loss { color: #ff5252; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Finans Portalı & Portföy Takibi</h1>
+        
+        <!-- Canlı Kurlar -->
+        <div class="cards">
+            <div class="card">
+                <h3>💵 Dolar (USD)</h3>
+                <div class="price">₺{{ kurlar['USD'] }}</div>
             </div>
-
-            <!-- Canlı Değişim Grafiği -->
-            <div class="grafik-kutusu">
-                <canvas id="finansGrafik"></canvas>
+            <div class="card">
+                <h3>💶 Euro (EUR)</h3>
+                <div class="price">₺{{ kurlar['EUR'] }}</div>
+            </div>
+            <div class="card">
+                <h3>🪙 Gram Altın</h3>
+                <div class="price">₺{{ kurlar['GA'] }}</div>
             </div>
         </div>
 
-        <script>
-            // Chart.js Çizgi Grafiği
-            const ctx = document.getElementById('finansGrafik').getContext('2d');
-            new Chart(ctx, {{
-                type: 'line',
-                data: {{
-                    labels: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Bugün'],
-                    datasets: [
-                        {{
-                            label: 'Gram Altın (TL)',
-                            data: [{gram_altin - 45}, {gram_altin - 30}, {gram_altin - 20}, {gram_altin - 10}, {gram_altin - 5}, {gram_altin}],
-                            borderColor: '#facc15',
-                            backgroundColor: 'rgba(250, 204, 21, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        }},
-                        {{
-                            label: 'Dolar (TL)',
-                            data: [{usd_try - 0.8}, {usd_try - 0.6}, {usd_try - 0.4}, {usd_try - 0.3}, {usd_try - 0.1}, {usd_try}],
-                            borderColor: '#38bdf8',
-                            backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        }}
-                    ]
-                }},
-                options: {{
-                    responsive: true,
-                    plugins: {{
-                        legend: {{ labels: {{ color: 'white' }} }}
-                    }},
-                    scales: {{
-                        x: {{ ticks: {{ color: '#94a3b8' }} }},
-                        y: {{ ticks: {{ color: '#94a3b8' }} }}
-                    }}
-                }}
-            }});
-        </script>
-    </body>
-    </html>
-    """
-    return render_template_string(html_kod)
+        <!-- Portföy Hesaplayıcı -->
+        <div class="portfolio-section">
+            <h2>💼 Portföy Kar / Zarar Hesaplama</h2>
+            <form method="POST">
+                <div class="form-group">
+                    <select name="varlik">
+                        <option value="USD">Dolar (USD)</option>
+                        <option value="EUR">Euro (EUR)</option>
+                        <option value="GA">Gram Altın</option>
+                    </select>
+                    <input type="number" step="any" name="miktar" placeholder="Miktar (Örn: 100)" required>
+                    <input type="number" step="any" name="alis_fiyati" placeholder="Alış Fiyatın (TL)" required>
+                    <button type="submit">Hesapla</button>
+                </div>
+            </form>
 
-if __name__ == "__main__":
+            {% if hesaplama %}
+            <div class="result-box">
+                <p><strong>Seçilen Varlık:</strong> {{ hesaplama.varlik_adi }}</p>
+                <p><strong>Miktar:</strong> {{ hesaplama.miktar }}</p>
+                <p><strong>Mevcut Canlı Değer:</strong> ₺{{ "%.2f"|format(hesaplama.toplam_mevcut) }}</p>
+                <p><strong>Toplam Yatırımın:</strong> ₺{{ "%.2f"|format(hesaplama.toplam_maliyet) }}</p>
+                <p><strong>Kar / Zarar Durumu:</strong> 
+                    <span class="{{ 'profit' if hesaplama.kar_zarar >= 0 else 'loss' }}">
+                        ₺{{ "%.2f"|format(hesaplama.kar_zarar) }} (%{{ "%.2f"|format(hesaplama.yuzde) }})
+                    </span>
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/', methods=['GET', 'POST'])
+def ana_sayfa():
+    kurlar = kurlari_al()
+    hesaplama = None
+
+    if request.method == 'POST':
+        varlik = request.form.get('varlik')
+        miktar = float(request.form.get('miktar', 0))
+        alis_fiyati = float(request.form.get('alis_fiyati', 0))
+
+        guncel_fiyat = kurlar.get(varlik, 0)
+        toplam_maliyet = miktar * alis_fiyati
+        toplam_mevcut = miktar * guncel_fiyat
+        kar_zarar = toplam_mevcut - toplam_maliyet
+        yuzde = (kar_zarar / toplam_maliyet * 100) if toplam_maliyet > 0 else 0
+
+        varlik_adlari = {'USD': 'Dolar', 'EUR': 'Euro', 'GA': 'Gram Altın'}
+
+        hesaplama = {
+            'varlik_adi': varlik_adlari.get(varlik, varlik),
+            'miktar': miktar,
+            'toplam_maliyet': toplam_maliyet,
+            'toplam_mevcut': toplam_mevcut,
+            'kar_zarar': kar_zarar,
+            'yuzde': yuzde
+        }
+
+    return render_template_string(HTML_KODU, kurlar=kurlar, hesaplama=hesaplama)
+
+if __name__ == '__main__':
     app.run(debug=True)
