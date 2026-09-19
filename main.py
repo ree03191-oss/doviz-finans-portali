@@ -8,7 +8,6 @@ def kurlari_al():
     eur_try = 37.50
     gram_24k_altin = 6870.0
 
-    # 1. Canlı Döviz Kurlarını Çek
     try:
         doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
         if doviz_res.status_code == 200:
@@ -19,7 +18,6 @@ def kurlari_al():
     except Exception as e:
         print("Döviz API Hatası:", e)
 
-    # 2. Canlı 24 Ayar Gram Altın Kuru Çek
     try:
         altin_res = requests.get("https://finans.truncgil.com/v3/today.json", timeout=5)
         if altin_res.status_code == 200:
@@ -41,8 +39,9 @@ HTML_KODU = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="kwQtL9CdecHzkRTkJOpAPH-Y1vkUs88M-CFZUu6fnXo" />
     
-    <!-- TEMEL SEO ETIKETLERI (Google için) -->
+    <!-- TEMEL SEO ETIKETLERI -->
     <meta name="google-site-verification" content="kwQtL9CdecHzkRTkJ0pAPM-YlvkUs88M-CFZUu6fnXo" />
     <title>Canlı Döviz, Altın Kurları ve Portföy Takip Portalı</title>
     <meta name="description" content="Canlı Dolar, Euro ve 24 Ayar Gram Altın fiyatlarını takip edin. Ücretsiz portföy takip aracı ve yapay zeka finans asistanı ile yatırımlarınızı yönetin.">
@@ -50,54 +49,118 @@ HTML_KODU = """
     <meta name="author" content="Finans Portalı">
     <meta name="robots" content="index, follow">
 
-    <!-- SOSYAL MEDYA PAYLAŞIM KARTLARI (Open Graph & Twitter) -->
+    <!-- SOSYAL MEDYA PAYLAŞIM KARTLARI -->
     <meta property="og:title" content="Canlı Döviz, Altın & Portföy Takip Portalı">
     <meta property="og:description" content="Canlı piyasa verileri, kişisel portföy hesaplama ve yapay zeka finans asistanı ile yatırımlarınızı anlık takip edin.">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Canlı Döviz & Portföy Takip Portalı">
-    <meta name="twitter:description" content="Canlı döviz, altın kurları ve AI Finans Asistanı ile yatırımlarınızı kolayca yönetin.">
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #ffffff;
+            --subtext-color: #a0a0a0;
+            --border-color: #333333;
+            --input-bg: #2a2a2a;
+            --table-hover: #252525;
+            --modal-bg: #1e1e1e;
+        }
+
+        body.light-theme {
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --text-color: #1a1a1a;
+            --subtext-color: #666666;
+            --border-color: #e0e0e0;
+            --input-bg: #f0f2f5;
+            --table-hover: #f8f9fa;
+            --modal-bg: #ffffff;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; transition: background 0.3s, color 0.3s; }
         .container { max-width: 1000px; margin: 0 auto; padding-bottom: 80px; }
-        h1 { text-align: center; color: #00e676; margin-bottom: 30px; }
+        
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { color: #00e676; margin: 0; font-size: 26px; }
+        
+        .theme-toggle-btn {
+            background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color);
+            padding: 8px 14px; border-radius: 20px; cursor: pointer; font-size: 18px;
+            display: flex; align-items: center; gap: 6px; font-weight: bold; transition: 0.2s;
+        }
+        .theme-toggle-btn:hover { opacity: 0.8; }
+
         .cards { display: flex; gap: 20px; justify-content: space-between; margin-bottom: 30px; flex-wrap: wrap; }
-        .card { background: #1e1e1e; border-radius: 12px; padding: 20px; flex: 1; min-width: 200px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); text-align: center; }
-        .card h3 { margin: 0; color: #a0a0a0; }
+        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; flex: 1; min-width: 200px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+        .card h3 { margin: 0; color: var(--subtext-color); }
         .card .price { font-size: 28px; font-weight: bold; margin: 10px 0; color: #00e676; }
         
-        .chart-section, .portfolio-section { background: #1e1e1e; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 30px; }
+        .chart-section, .portfolio-section { background: var(--card-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
         .chart-header h2, .portfolio-section h2 { margin: 0; color: #00e676; }
-        .chart-btn { background: #2a2a2a; color: #aaa; border: 1px solid #444; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .chart-btn { background: var(--input-bg); color: var(--subtext-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
         .chart-btn.active { background: #00e676; color: #121212; border-color: #00e676; }
 
         .form-group { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
-        input, select, button { padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2a2a2a; color: white; font-size: 16px; }
+        input, select, button { padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); font-size: 16px; }
         input { flex: 1; min-width: 140px; }
         button { background: #00e676; color: #121212; font-weight: bold; cursor: pointer; border: none; transition: 0.2s; }
         button:hover { background: #00c853; }
         .btn-delete { background: #ff5252; color: white; padding: 6px 12px; font-size: 14px; border-radius: 6px; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 15px; text-align: left; }
-        th, td { padding: 14px; border-bottom: 1px solid #333; }
-        th { background-color: #2a2a2a; color: #00e676; }
-        tr:hover { background-color: #252525; }
+        th, td { padding: 14px; border-bottom: 1px solid var(--border-color); }
+        th { background-color: var(--input-bg); color: #00e676; }
+        tr:hover { background-color: var(--table-hover); }
 
         .summary-cards { display: flex; gap: 15px; margin-top: 25px; flex-wrap: wrap; }
-        .summary-card { background: #2a2a2a; padding: 18px; border-radius: 10px; flex: 1; min-width: 180px; text-align: center; }
-        .summary-card span { display: block; font-size: 14px; color: #aaa; margin-bottom: 5px; }
+        .summary-card { background: var(--input-bg); border: 1px solid var(--border-color); padding: 18px; border-radius: 10px; flex: 1; min-width: 180px; text-align: center; }
+        .summary-card span { display: block; font-size: 14px; color: var(--subtext-color); margin-bottom: 5px; }
         .summary-card strong { font-size: 22px; }
 
         .profit { color: #00e676; }
         .loss { color: #ff5252; }
 
-        /* YAZILIM / AI CHATBOT STİLLERİ */
+        /* FOOTER & GIZLILIK MIKRO BARKOTU */
+        footer {
+            margin-top: 40px; padding: 20px 0; border-top: 1px solid var(--border-color);
+            text-align: center; font-size: 14px; color: var(--subtext-color);
+        }
+        footer a { color: #00e676; text-decoration: none; cursor: pointer; margin: 0 10px; font-weight: 500; }
+        footer a:hover { text-decoration: underline; }
+
+        /* ÇEREZ BILDIRIMI (COOKIE BANNER) */
+        .cookie-banner {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--card-bg); border-top: 2px solid #00e676;
+            padding: 15px 25px; display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.3); z-index: 2000; flex-wrap: wrap; gap: 15px;
+        }
+        .cookie-banner p { margin: 0; font-size: 14px; color: var(--text-color); flex: 1; min-width: 250px; }
+        .cookie-banner button { padding: 8px 20px; font-size: 14px; }
+
+        /* MODAL (GIZLILIK POLITIKASI PENCERESI) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center;
+            z-index: 3000; padding: 20px; box-sizing: border-box;
+        }
+        .modal-content {
+            background: var(--modal-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; max-width: 650px; width: 100%; max-height: 80vh;
+            overflow-y: auto; padding: 25px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); position: relative;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 15px; }
+        .modal-header h2 { margin: 0; color: #00e676; font-size: 20px; }
+        .close-btn { font-size: 24px; cursor: pointer; color: var(--subtext-color); }
+        .close-btn:hover { color: var(--text-color); }
+        .modal-body { font-size: 14px; line-height: 1.6; color: var(--text-color); }
+
         .ai-widget-toggle {
-            position: fixed; bottom: 25px; right: 25px;
+            position: fixed; bottom: 80px; right: 25px;
             background: #00e676; color: #121212; border-radius: 50%;
             width: 60px; height: 60px; font-size: 28px;
             display: flex; justify-content: center; align-items: center;
@@ -107,18 +170,18 @@ HTML_KODU = """
         .ai-widget-toggle:hover { transform: scale(1.1); }
 
         .ai-chat-box {
-            position: fixed; bottom: 95px; right: 25px;
-            width: 350px; height: 450px; background: #1e1e1e;
-            border-radius: 12px; border: 1px solid #333;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.7);
+            position: fixed; bottom: 150px; right: 25px;
+            width: 350px; height: 450px; background: var(--card-bg);
+            border-radius: 12px; border: 1px solid var(--border-color);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
             display: none; flex-direction: column; z-index: 1000;
             overflow: hidden;
         }
 
         .ai-chat-header {
-            background: #2a2a2a; padding: 15px; color: #00e676;
+            background: var(--input-bg); padding: 15px; color: #00e676;
             font-weight: bold; display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid var(--border-color);
         }
 
         .ai-chat-messages {
@@ -127,16 +190,19 @@ HTML_KODU = """
 
         .chat-msg { max-width: 80%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
         .chat-msg.user { background: #00e676; color: #121212; align-self: flex-end; border-bottom-right-radius: 2px; }
-        .chat-msg.ai { background: #2a2a2a; color: #ffffff; align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid #333; }
+        .chat-msg.ai { background: var(--input-bg); color: var(--text-color); align-self: flex-start; border-bottom-left-radius: 2px; border: 1px solid var(--border-color); }
 
-        .ai-chat-input { display: flex; border-top: 1px solid #333; padding: 10px; background: #181818; }
-        .ai-chat-input input { flex: 1; border: none; background: #2a2a2a; color: white; border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+        .ai-chat-input { display: flex; border-top: 1px solid var(--border-color); padding: 10px; background: var(--card-bg); }
+        .ai-chat-input input { flex: 1; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color); border-radius: 6px; padding: 8px 12px; font-size: 14px; }
         .ai-chat-input button { margin-left: 8px; padding: 8px 14px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>📊 Canlı Finans Portalı & Portföy Takibi</h1>
+        <div class="header-bar">
+            <h1>📊 Canlı Finans Portalı & Portföy Takibi</h1>
+            <button class="theme-toggle-btn" onclick="temaDegistir()" id="themeBtn">☀️ Açık Mod</button>
+        </div>
         
         <div class="cards">
             <div class="card">
@@ -209,9 +275,52 @@ HTML_KODU = """
                 </div>
             </div>
         </div>
+
+        <footer>
+            <p>© 2026 Canlı Finans Portalı. Tüm hakları saklıdır.</p>
+            <p>
+                <a onclick="openModal('privacyModal')">Gizlilik Politikası</a> | 
+                <a onclick="openModal('termsModal')">Kullanım Şartları</a>
+            </p>
+        </footer>
     </div>
 
-    <!-- YAPAY ZEKA SOHBET WIDGET'I -->
+    <!-- ÇEREZ BILDIRIMI (COOKIE CONSENT) -->
+    <div class="cookie-banner" id="cookieBanner" style="display: none;">
+        <p>🍪 Sitemizde deneyiminizi geliştirmek, tercihlerinizi (tema, portföy) hatırlamak ve Google AdSense reklam hizmetlerini sunabilmek için çerezler kullanılmaktadır.</p>
+        <button onclick="acceptCookies()">Kabul Et</button>
+    </div>
+
+    <!-- GİZLİLİK POLİTİKASI MODAL -->
+    <div class="modal-overlay" id="privacyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔒 Gizlilik Politikası</h2>
+                <span class="close-btn" onclick="closeModal('privacyModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p><strong>1. Veri Toplama ve Kullanımı:</strong> Canlı Finans Portalı, ziyaretçilerin kişisel verilerini sunucularında saklamaz. Portföy verileriniz ve tema tercihleriniz yalnızca tarayıcınızın yerel depolama alanında (localStorage) tutulur.</p>
+                <p><strong>2. Çerezler (Cookies) ve Google AdSense:</strong> Sitemiz, kullanıcı deneyimini iyileştirmek ve üçüncü taraf reklam ortaklarımız (Google AdSense gibi) aracılığıyla kişiselleştirilmiş reklamlar sunmak amacıyla çerezler kullanabilir. Google, web sitemize yaptığı önceki ziyaretlere dayalı olarak reklam sunmak için çerezlerden yararlanır.</p>
+                <p><strong>3. Üçüncü Taraf Bağlantılar:</strong> Sitemiz canlı kur verilerini güvenilir açık kaynaklı finansal API'ler aracılığıyla çekmektedir.</p>
+                <p><strong>4. İletişim:</strong> Gizlilik politikamızla ilgili sorularınız için bizimle portalımız üzerinden iletişime geçebilirsiniz.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- KULLANIM ŞARTLARI MODAL -->
+    <div class="modal-overlay" id="termsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📜 Kullanım Şartları</h2>
+                <span class="close-btn" onclick="closeModal('termsModal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p><strong>Yatırım Tavsiyesi Değildir:</strong> Bu sitede sunulan canlı döviz, altın kurları ve yapay zeka finans asistanı yanıtları yalnızca bilgilendirme amaçlıdır. Hiçbir içerik kesinlikle yatırım tavsiyesi (YTD) niteliği taşımaz.</p>
+                <p><strong>Veri Doğruluğu:</strong> Piyasalar anlık değişiklik gösterebilir. Sitede yer alan verilerdeki gecikme veya hatalardan portalımız sorumlu tutulamaz.</p>
+            </div>
+        </div>
+    </div>
+
     <button class="ai-widget-toggle" onclick="toggleAIChat()">🤖</button>
     <div class="ai-chat-box" id="aiChatBox">
         <div class="ai-chat-header">
@@ -244,9 +353,53 @@ HTML_KODU = """
         let mevcutGrafik = null;
         let aktifGrafikTuru = 'kurlar';
 
+        // TEMA YÖNETİMİ
+        const mevcuttema = localStorage.getItem('site_temasi');
+        if (mevcuttema === 'light') {
+            document.body.classList.add('light-theme');
+            document.getElementById('themeBtn').innerText = '🌙 Koyu Mod';
+        }
+
+        function temaDegistir() {
+            document.body.classList.toggle('light-theme');
+            const isLight = document.body.classList.contains('light-theme');
+            document.getElementById('themeBtn').innerText = isLight ? '🌙 Koyu Mod' : '☀️ Açık Mod';
+            localStorage.setItem('site_temasi', isLight ? 'light' : 'dark');
+            grafatCiz();
+        }
+
+        // ÇEREZ BİLDİRİMİ KONTROLÜ
+        if (!localStorage.getItem('cookies_accepted')) {
+            document.getElementById('cookieBanner').style.display = 'flex';
+        }
+
+        function acceptCookies() {
+            localStorage.setItem('cookies_accepted', 'true');
+            document.getElementById('cookieBanner').style.display = 'none';
+        }
+
+        // MODAL YÖNETİMİ
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-overlay')) {
+                event.target.style.display = 'none';
+            }
+        };
+
         function grafatCiz() {
             const ctx = document.getElementById('finansGrafik').getContext('2d');
             if (mevcutGrafik) { mevcutGrafik.destroy(); }
+
+            const isLight = document.body.classList.contains('light-theme');
+            const textColor = isLight ? '#1a1a1a' : '#ffffff';
+            const gridColor = isLight ? '#e0e0e0' : '#333333';
 
             if (aktifGrafikTuru === 'kurlar') {
                 mevcutGrafik = new Chart(ctx, {
@@ -265,8 +418,8 @@ HTML_KODU = """
                         maintainAspectRatio: false,
                         plugins: { legend: { display: false } },
                         scales: {
-                            y: { ticks: { color: '#aaa' }, grid: { color: '#333' } },
-                            x: { ticks: { color: '#fff' }, grid: { display: false } }
+                            y: { ticks: { color: textColor }, grid: { color: gridColor } },
+                            x: { ticks: { color: textColor }, grid: { display: false } }
                         }
                     }
                 });
@@ -287,13 +440,13 @@ HTML_KODU = """
                             data: [usdDeger, eurDeger, gaDeger],
                             backgroundColor: ['#00e676', '#29b6f6', '#ffd700'],
                             borderWidth: 2,
-                            borderColor: '#1e1e1e'
+                            borderColor: isLight ? '#ffffff' : '#1e1e1e'
                         }]
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: { legend: { labels: { color: '#ffffff', font: { size: 14 } } } }
+                        plugins: { legend: { labels: { color: textColor, font: { size: 14 } } } }
                     }
                 });
             }
@@ -371,7 +524,6 @@ HTML_KODU = """
             tabloyuGuncelle();
         }
 
-        /* AI CHATBOT MANTIĞI */
         function toggleAIChat() {
             const chatBox = document.getElementById('aiChatBox');
             chatBox.style.display = (chatBox.style.display === 'flex') ? 'none' : 'flex';
@@ -384,7 +536,6 @@ HTML_KODU = """
 
             const messagesBox = document.getElementById('aiMessages');
             
-            // Kullanıcı Mesajı
             const userMsg = document.createElement('div');
             userMsg.className = 'chat-msg user';
             userMsg.innerText = soru;
@@ -393,7 +544,6 @@ HTML_KODU = """
             input.value = '';
             messagesBox.scrollTop = messagesBox.scrollHeight;
 
-            // AI Yanıtı
             fetch('/ai_soru', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
