@@ -2,6 +2,7 @@ import sqlite3
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 app.secret_key = 'finans_gizli_anahtar_key_2026'
@@ -38,39 +39,52 @@ def init_db():
 
 init_db()
 
-# --- %100 ÇALIŞAN GARANTİLİ CANLI KUR SERVİSİ ---
-from bs4 import BeautifulSoup
-
+# --- GÜNCELLENMİŞ CANLI KUR SERVİSİ (SCRAPER + YEDEK API) ---
 def kurlari_al():
     # Varsayılan değerler
+    usd_try, eur_try, gram_altin = 34.20, 37.50, 3050.0
+    btc_usd, eth_usd = 65000.0, 3500.0
+
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
 
-    # 1. DÖVİZ VE GRAM ALTIN (Döviz.com üzerinden HTML Kazıma - Kazıması En Kolay ve Stabil)
+    # 1. DÖVİZ VE GRAM ALTIN (Döviz.com HTML Kazıma)
     try:
         response = requests.get("https://www.doviz.com/", headers=headers, timeout=5)
         if response.status_code == 200:
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+
             # Dolar
             usd_elem = soup.find('span', {'data-socket-key': 'USD'})
             if usd_elem:
-                usd_try = float(usd_elem.text.replace('.', '').replace(',', '.'))
-                
+                usd_try = float(usd_elem.text.strip().replace('.', '').replace(',', '.'))
+
             # Euro
             eur_elem = soup.find('span', {'data-socket-key': 'EUR'})
             if eur_elem:
-                eur_try = float(eur_elem.text.replace('.', '').replace(',', '.'))
-                
+                eur_try = float(eur_elem.text.strip().replace('.', '').replace(',', '.'))
+
             # Gram Altın
             ga_elem = soup.find('span', {'data-socket-key': 'gram-altin'})
             if ga_elem:
-                gram_altin = float(ga_elem.text.replace('.', '').replace(',', '.'))
+                gram_altin = float(ga_elem.text.strip().replace('.', '').replace(',', '.'))
+        else:
+            # Döviz.com engeline takılırsa yedek JSON API devreye girer
+            res = requests.get("https://api.genelpara.com/embed/doviz.json", headers=headers, timeout=3)
+            altin_res = requests.get("https://api.genelpara.com/embed/altin.json", headers=headers, timeout=3)
+            if res.status_code == 200:
+                d_data = res.json()
+                usd_try = float(d_data['USD']['satis'])
+                eur_try = float(d_data['EUR']['satis'])
+            if altin_res.status_code == 200:
+                a_data = altin_res.json()
+                gram_altin = float(a_data['GA']['satis'])
+
     except Exception as e:
         print(f"Döviz/Altın Hatası: {e}")
 
-    # 2. KRİPTO PARALAR (Binance Resmi API - Kesintisiz)
+    # 2. KRİPTO PARALAR (Binance Resmi API)
     try:
         btc_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=3)
         if btc_res.status_code == 200:
@@ -89,63 +103,8 @@ def kurlari_al():
         'BTC': round(btc_usd * usd_try, 2), # TL Karşılığı
         'ETH': round(eth_usd * usd_try, 2)  # TL Karşılığı
     }
-    # 2. Gram Altın (Ons Altın ve Dolar Üzerinden %100 Kesin Matematiksel Hesaplama)
-    # Gram Altın = (Ons Fiyatı / 31.1034768) * Dolar Kuru
-    try:
-        res = requests.get("https://query1.finance.yahoo.com/v8/finance/chart/GC=F", headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
-        if res.status_code == 200:
-            ons_usd = float(res.json()['chart']['result'][0]['meta']['regularMarketPrice'])
-            gram_altin = (ons_usd / 31.1034768) * usd_try
-    except Exception:
-        # Altın Yedeği (Canlı Altın API)
-        try:
-            res = requests.get("https://api.collectapi.com/gold/goldPrice", headers={"authorization": "apikey YOUR_KEY"}, timeout=3)
-            # Dolar * 90 TL tahmini standart çarpan yedeği
-            gram_altin = usd_try * 90.5 
-        except Exception:
-            pass
 
-    # 3. Kripto Paralar (Binance API - Anlık ve Doğrudan)
-    try:
-        btc_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=3)
-        if btc_res.status_code == 200:
-            btc_usd = float(btc_res.json()['price'])
-
-        eth_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", timeout=3)
-        if eth_res.status_code == 200:
-            eth_usd = float(eth_res.json()['price'])
-    except Exception:
-        pass
-
-    return {
-        'USD': round(usd_try, 2),
-        'EUR': round(eur_try, 2),
-        'GA': round(gram_altin, 2),
-        'BTC': round(btc_usd * usd_try, 2), # TL Karşılığı
-        'ETH': round(eth_usd * usd_try, 2)  # TL Karşılığı
-    }
-
-    # 2. Canlı Kripto Para Verisi (Binance API - %100 Garantili)
-    try:
-        btc_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=3)
-        if btc_res.status_code == 200:
-            btc_usd = float(btc_res.json()['price'])
-
-        eth_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT", timeout=3)
-        if eth_res.status_code == 200:
-            eth_usd = float(eth_res.json()['price'])
-    except Exception:
-        pass
-
-    return {
-        'USD': round(usd_try, 2),
-        'EUR': round(eur_try, 2),
-        'GA': round(gram_altin, 2),
-        'BTC': round(btc_usd * usd_try, 2), # TL Karşılığı
-        'ETH': round(eth_usd * usd_try, 2)  # TL Karşılığı
-    }
-
-# --- SHINGLE / HTML ARAYÜZÜ ---
+# --- HTML ARAYÜZÜ ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="tr">
