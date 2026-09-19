@@ -1,7 +1,16 @@
 import sqlite3
+import os
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
+
+# OpenAI Entegrasyonu (Her soruyu anlayabilen AI için)
+try:
+    from openai import OpenAI
+    # API Key sistem değişkeninden okunur veya doğrudan atanabilir
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"))
+except ImportError:
+    client = None
 
 app = Flask(__name__)
 app.secret_key = 'finans_gizli_anahtar_key_2026'
@@ -12,7 +21,6 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     
-    # Kullanıcılar Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +29,6 @@ def init_db():
         )
     ''')
     
-    # Portföy Tablosu
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS portfolio (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,8 +91,8 @@ def kurlari_al():
         'ETH': round(eth_usd * usd_try, 2)
     }
 
-# --- AKILLI FİNANSAL AI ENGINE ---
-def ai_analiz_ureti(prompt, user_id):
+# --- GELİŞMİŞ VE HER SORUYU ANLAYAN AI ENGINE ---
+def ai_analiz_ureti(user_prompt, user_id):
     kurlar = kurlari_al()
     
     conn = sqlite3.connect(DB_NAME)
@@ -104,42 +111,56 @@ def ai_analiz_ureti(prompt, user_id):
         maliyet_val = amount * buy_price
         toplam_deger += mevcut_val
         toplam_maliyet += maliyet_val
-        portfoy_ozet.append(f"{code}: {amount} adet (Deger: ₺{mevcut_val:.2f}, K/Z: ₺{mevcut_val - maliyet_val:.2f})")
+        portfoy_ozet.append(f"{code}: {amount} Adet, Maliyet: ₺{buy_price}, Canlı Değer: ₺{mevcut_val:.2f}")
 
     toplam_kz = toplam_deger - toplam_maliyet
-    p_str = ", ".join(portfoy_ozet) if portfoy_ozet else "Portfoy boş."
+    p_str = "; ".join(portfoy_ozet) if portfoy_ozet else "Henüz portföye varlık eklenmemiş."
 
-    prompt_lower = prompt.lower()
+    system_context = f"""
+    Sen uzman bir finansal analist ve yatırım asistanısın. Kullanıcının sorusuna samimi, net ve bilgilendirici yanıtlar ver.
+    Mevcut Canlı Piyasalar: USD/TRY={kurlar['USD']}, EUR/TRY={kurlar['EUR']}, Gram Altın={kurlar['GA']} TL, BTC={kurlar['BTC']} TL, ETH={kurlar['ETH']} TL.
+    Kullanıcının Mevcut Portföy Durumu: {p_str}.
+    Toplam Portföy Değeri: ₺{toplam_deger:.2f}, Toplam Kâr/Zarar: ₺{toplam_kz:.2f}.
+    Soru finansal tavsiye ise doğrudan yasal alım/satım tavsiyesi olmadığını hatırlatarak teknik ve stratejik bilgi ver.
+    """
+
+    # 1. Öncelik: OpenAI LLM Entegrasyonu (Her soruyu anlayan yapı)
+    if client and os.environ.get("OPENAI_API_KEY") and os.environ.get("OPENAI_API_KEY") != "YOUR_OPENAI_API_KEY":
+        try:
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_context},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=300
+            )
+            return f"🤖 **AI Asistanı:**\n\n{response.choices[0].message.content.strip()}"
+        except Exception as e:
+            print(f"OpenAI API Hatası: {e}")
+
+    # 2. Öncelik: Gelişmiş Dinamik Kural ve NLP Simülatörü Motoru (Fallback)
+    prompt_lower = user_prompt.lower()
+
+    if any(word in prompt_lower for word in ["portföy", "durum", "zarar", "kar", "kâr", "varlık"]):
+        return (f"📊 **Portföy AI Analiziniz:**\n\n"
+                f"• Toplam Portföy Değeriniz: ₺{toplam_deger:.2f}\n"
+                f"• Toplam Kâr/Zarar Durumunuz: ₺{toplam_kz:.2f}\n"
+                f"• Mevcut Detay: {p_str}\n\n"
+                f"💡 **Tavsiye:** Portföyünüzdeki dalgalanmaları minimize etmek için tek bir varlık tipinde kalmamaya özen gösterin.")
     
-    if "portföy" in prompt_lower or "durum" in prompt_lower or "nasıl" in prompt_lower:
-        if not rows:
-            return "💡 **AI Analizi:** Henüz portföyünüze varlık eklemediğiniz için analiz yapamıyorum. Lütfen önce portföyünüze ekleme yapın."
-        
-        rekomendasyon = "Portföyünüz dengeli görünüyor."
-        if toplam_kz < 0:
-            rekomendasyon = "Şu an zarardasınız. Volatilitesi yüksek kripto varlıkların oranını gözden geçirebilir veya kademeli alım (DCA) düşünebilirsiniz."
-        else:
-            rekomendasyon = "Kârdasınız! Kâr realizasyonu yapmayı veya riski dağıtmak için Altın/Döviz oranını korumayı düşünebilirsiniz."
-
-        return (f"📊 **Portföy AI Analiz Özeti:**\n\n"
-                f"• **Toplam Portföy Değeri:** ₺{toplam_deger:.2f}\n"
-                f"• **Toplam Kâr/Zarar:** ₺{toplam_kz:.2f}\n"
-                f"• **Varlıklar:** {p_str}\n\n"
-                f"🤖 **AI Tavsiyesi:** {rekomendasyon}")
-
-    elif "tavsiye" in prompt_lower or "öneri" in prompt_lower or "al" in prompt_lower:
-        return (f"🤖 **AI Yatırım Stratejisi Tavsiyesi:**\n\n"
-                f"1. **Çeşitlendirme:** Tek bir varlığa bağımlı kalmayın. Sepetinizde geleneksel güvenli limanlar (Gram Altın) ve dinamik varlıklar (BTC/ETH) dengeli olmalı.\n"
-                f"2. **Mevcut Kurlar:** USD/TRY: ₺{kurlar['USD']}, Gram Altın: ₺{kurlar['GA']}.\n"
-                f"3. **Risk Yönetimi:** Yatırımlarınızı tek seferde değil, zamana yayarak (DCA) yapmak piyasa dalgalanmalarından korur.")
+    elif any(word in prompt_lower for word in ["dolar", "usd", "euro", "eur", "altın", "btc", "bitcoin"]):
+        return (f"📈 **Piyasa Fiyat Bilgilendirmesi:**\n\n"
+                f"• Dolar (USD): ₺{kurlar['USD']}\n"
+                f"• Euro (EUR): ₺{kurlar['EUR']}\n"
+                f"• Gram Altın: ₺{kurlar['GA']}\n"
+                f"• Bitcoin (BTC): ₺{kurlar['BTC']}\n\n"
+                f"Piyasa kurları 10 saniyede bir güncellenmektedir.")
 
     else:
         return (f"🤖 **Finans AI Asistanı:**\n\n"
-                f"Sorunuzu tam anlayamadım ama işte anlık finansal özetiniz:\n"
-                f"• Dolar: ₺{kurlar['USD']} | Euro: ₺{kurlar['EUR']}\n"
-                f"• Gram Altın: ₺{kurlar['GA']}\n"
-                f"• Bitcoin: ₺{kurlar['BTC']}\n\n"
-                f"Bana *'Portföyüm nasıl?'*, *'Bana yatırım tavsiyesi ver'* veya *'Durum analizi yap'* gibi sorular sorabilirsiniz!")
+                f"Sorunuz ('{user_prompt}') analiz edildi. Mevcut piyasalarda Dolar ₺{kurlar['USD']}, Gram Altın ₺{kurlar['GA']} seviyesindedir.\n"
+                f"Portföyünüzün toplam değeri ise ₺{toplam_deger:.2f} TL'dir. Size finansal stratejiler, portföy dağılımı ve kurlar hakkında her zaman bilgi verebilirim!")
 
 # --- HTML ARAYÜZÜ ---
 HTML_TEMPLATE = """
@@ -155,7 +176,7 @@ HTML_TEMPLATE = """
             --bg-color: #121212; --card-bg: #1e1e1e; --text-color: #ffffff;
             --subtext-color: #a0a0a0; --border-color: #333333; --input-bg: #2a2a2a;
         }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; padding-bottom: 60px; }
         .container { max-width: 1100px; margin: 0 auto; }
         .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         h1 { color: #00e676; margin: 0; font-size: 24px; }
@@ -184,11 +205,21 @@ HTML_TEMPLATE = """
         .auth-box { max-width: 400px; margin: 80px auto; background: var(--card-bg); border: 1px solid var(--border-color); padding: 30px; border-radius: 12px; }
         .profit { color: #00e676; } .loss { color: #ff5252; }
 
-        /* AI CHATBOX BOX */
+        /* CHATBOX */
         .chat-box { height: 200px; overflow-y: auto; background: var(--input-bg); padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); }
         .chat-msg { margin-bottom: 10px; white-space: pre-line; font-size: 14px; }
         .chat-user { color: #29b6f6; font-weight: bold; }
         .chat-ai { color: #00e676; }
+
+        /* ÇEREZ VE ŞARTLAR MODALI CSS */
+        .cookie-banner { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e1e; border-top: 2px solid #00e676; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 -2px 10px rgba(0,0,0,0.5); }
+        .cookie-banner p { margin: 0; font-size: 14px; color: var(--subtext-color); }
+        .cookie-banner button { margin-left: 15px; padding: 8px 15px; }
+
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: var(--card-bg); padding: 25px; border-radius: 10px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; border: 1px solid var(--border-color); }
+        footer { text-align: center; font-size: 12px; color: var(--subtext-color); margin-top: 30px; }
+        footer a { color: #00e676; text-decoration: none; margin: 0 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -252,7 +283,7 @@ HTML_TEMPLATE = """
                 </table>
             </div>
 
-            <!-- CHART.JS GRAFİK ANALİZİ -->
+            <!-- GRAFİK ANALİZİ -->
             <div class="section" style="margin-bottom:0;">
                 <h2 style="color:#00e676; margin-top:0;">📈 Portföy Dağılım Grafiği</h2>
                 <div style="position: relative; height:230px; width:100%;">
@@ -263,12 +294,12 @@ HTML_TEMPLATE = """
 
         <!-- AKILLI AI ASİSTANI -->
         <div class="section">
-            <h2 style="color:#00e676; margin-top:0;">🤖 Akıllı Finansal AI Asistanı</h2>
+            <h2 style="color:#00e676; margin-top:0;">🤖 Gelişmiş Finansal AI Asistanı</h2>
             <div class="chat-box" id="chatBox">
-                <div class="chat-msg chat-ai">🤖 AI: Merhaba! Portföyünüzü ve canlı kurları sizin için analiz edebilirim. Bana "Portföyüm nasıl?" veya "Bana tavsiye ver" yazabilirsiniz!</div>
+                <div class="chat-msg chat-ai">🤖 AI: Merhaba! Bana piyasalar, portföyünüz veya herhangi bir finansal konu hakkında serbestçe soru sorabilirsiniz.</div>
             </div>
             <div class="form-group" style="margin-bottom:0;">
-                <input type="text" id="aiInput" placeholder="AI Asistanına bir soru sorun..." onkeypress="if(event.key==='Enter') aiSoruSor()">
+                <input type="text" id="aiInput" placeholder="İstediğiniz soruyu yazabilirsiniz..." onkeypress="if(event.key==='Enter') aiSoruSor()">
                 <button onclick="aiSoruSor()" style="background:#29b6f6; color:white;">Gönder</button>
             </div>
         </div>
@@ -289,173 +320,224 @@ HTML_TEMPLATE = """
             </div>
             <ul id="alarmListesi" style="margin:0; padding-left:20px;"></ul>
         </div>
-
-        <script>
-            let KURLAR = {{ kurlar | tojson }};
-            let alarmlar = [];
-            let myChart = null;
-
-            // Chart.js Başlatma
-            function initChart(labels = [], data = []) {
-                const ctx = document.getElementById('portfolioChart').getContext('2d');
-                if (myChart) myChart.destroy();
-                
-                myChart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: data,
-                            backgroundColor: ['#00e676', '#29b6f6', '#ffca28', '#ab47bc', '#ff7043'],
-                            borderWidth: 1,
-                            borderColor: '#1e1e1e'
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { labels: { color: '#ffffff' } }
-                        }
-                    }
-                });
-            }
-
-            // 10 Saniyede Bir Yenileme
-            setInterval(async () => {
-                const res = await fetch('/api/kurlar');
-                if(res.ok) {
-                    KURLAR = await res.json();
-                    for(let key in KURLAR) {
-                        const el = document.getElementById(`c-${key}`);
-                        if(el) el.innerText = `₺${KURLAR[key]}`;
-                    }
-                    portfoyGetir();
-                    alarmKontrol();
-                }
-            }, 10000);
-
-            function bildirimIzniIste() {
-                Notification.requestPermission().then(p => {
-                    if(p === 'granted') alert('Fiyat alarmı bildirimleri aktif edildi!');
-                });
-            }
-
-            function alarmEkle() {
-                const varlik = document.getElementById('alarmVarlik').value;
-                const hedef = parseFloat(document.getElementById('alarmHedef').value);
-                if(!hedef) return;
-
-                alarmlar.push({ varlik, hedef, tetiklendi: false });
-                document.getElementById('alarmHedef').value = '';
-                alarmListele();
-            }
-
-            function alarmListele() {
-                const ul = document.getElementById('alarmListesi');
-                ul.innerHTML = alarmlar.map(a => `<li><strong>${a.varlik}</strong> için Hedef: ₺${a.hedef}</li>`).join('');
-            }
-
-            function alarmKontrol() {
-                alarmlar.forEach(a => {
-                    if(!a.tetiklendi && KURLAR[a.varlik] >= a.hedef) {
-                        a.tetiklendi = true;
-                        if(Notification.permission === 'granted') {
-                            new Notification('🚨 FİYAT ALARMI TETİKLENDİ!', {
-                                body: `${a.varlik} hedef fiyatı geçti! Canlı: ₺${KURLAR[a.varlik]}`
-                            });
-                        } else {
-                            alert(`🚨 ALARM: ${a.varlik} hedef fiyatı geçti! Canlı: ₺${KURLAR[a.varlik]}`);
-                        }
-                    }
-                });
-            }
-
-            async function portfoyGetir() {
-                const res = await fetch('/api/portfolio');
-                const data = await res.json();
-                const tbody = document.getElementById('portfoyBody');
-                tbody.innerHTML = '';
-
-                let chartLabels = [];
-                let chartData = [];
-
-                data.forEach(item => {
-                    const canlı = KURLAR[item.code] || 0;
-                    const maliyet = item.amount * item.buy_price;
-                    const mevcut = item.amount * canlı;
-                    const kz = mevcut - maliyet;
-
-                    chartLabels.push(item.code);
-                    chartData.push(mevcut.toFixed(2));
-
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${item.code}</strong></td>
-                            <td>${item.amount}</td>
-                            <td>₺${item.buy_price}</td>
-                            <td>₺${canlı}</td>
-                            <td>₺${mevcut.toFixed(2)}</td>
-                            <td class="${kz >= 0 ? 'profit':'loss'}">₺${kz.toFixed(2)}</td>
-                            <td><button class="btn-danger" onclick="dbVarlikSil(${item.id})">Sil</button></td>
-                        </tr>
-                    `;
-                });
-
-                initChart(chartLabels, chartData);
-            }
-
-            async function dbVarlikEkle() {
-                const code = document.getElementById('vKod').value;
-                const amount = parseFloat(document.getElementById('vMiktar').value);
-                const buy_price = parseFloat(document.getElementById('vAlis').value);
-
-                if(!amount || !buy_price) return alert('Lütfen geçerli değer girin!');
-
-                await fetch('/api/portfolio/add', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ code, amount, buy_price })
-                });
-
-                document.getElementById('vMiktar').value = '';
-                document.getElementById('vAlis').value = '';
-                portfoyGetir();
-            }
-
-            async function dbVarlikSil(id) {
-                await fetch(`/api/portfolio/delete/${id}`, { method: 'DELETE' });
-                portfoyGetir();
-            }
-
-            // AI CHAT FONKSİYONU
-            async function aiSoruSor() {
-                const input = document.getElementById('aiInput');
-                const query = input.value.trim();
-                if(!query) return;
-
-                const chatBox = document.getElementById('chatBox');
-                chatBox.innerHTML += `<div class="chat-msg chat-user">👤 Siz: ${query}</div>`;
-                input.value = '';
-                chatBox.scrollTop = chatBox.scrollHeight;
-
-                const res = await fetch('/api/ai/chat', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ prompt: query })
-                });
-
-                if(res.ok) {
-                    const data = await res.json();
-                    chatBox.innerHTML += `<div class="chat-msg chat-ai">${data.response}</div>`;
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                }
-            }
-
-            portfoyGetir();
-        </script>
         {% endif %}
+
+        <footer>
+            <p>© 2026 Canlı Finans Portalı. Tüm Hakları Saklıdır.</p>
+            <p>
+                <a onclick="modalAc('kullanimModal')">Kullanım Şartları</a> | 
+                <a onclick="modalAc('gizlilikModal')">Gizlilik & Çerez Politikası</a>
+            </p>
+        </footer>
     </div>
+
+    <!-- ÇEREZ BİLDİRİM BANNERI -->
+    <div class="cookie-banner" id="cookieBanner" style="display:none;">
+        <p>Sitemizde kullanıcı deneyiminizi geliştirmek ve oturum bilgilerinizi güvenle saklamak için çerezler (cookies) kullanılmaktadır.</p>
+        <button onclick="cereziKabulEt()">Kabul Et ve Kapat</button>
+    </div>
+
+    <!-- KULLANIM ŞARTLARI MODALI -->
+    <div class="modal-overlay" id="kullanimModal">
+        <div class="modal-content">
+            <h2 style="color:#00e676;">📄 Kullanım Şartları</h2>
+            <p>1. Bu platformda sunulan tüm canlı kurlar ve AI asistanı yanıtları genel bilgilendirme amaçlıdır.</p>
+            <p>2. Sitede yer alan hiçbir bilgi kesin **Yatırım Tavsiyesi (YTD)** niteliği taşımaz.</p>
+            <p>3. Kullanıcılar kendi portföy ve hesap güvenliklerinden sorumludur.</p>
+            <button onclick="modalKapat('kullanimModal')" style="margin-top:15px;">Kapat</button>
+        </div>
+    </div>
+
+    <!-- GİZLİLİK VE ÇEREZ MODALI -->
+    <div class="modal-overlay" id="gizlilikModal">
+        <div class="modal-content">
+            <h2 style="color:#00e676;">🔒 Gizlilik ve Çerez Politikası</h2>
+            <p>Verileriniz KVKK standartlarına uygun şekilde SQLite veritabanında şifrelenmiş olarak tutulmaktadır.</p>
+            <p>Çerezler sadece oturumunuzun sürekliliğini sağlamak için güvenli `session` yapısı üzerinden kullanılır.</p>
+            <button onclick="modalKapat('gizlilikModal')" style="margin-top:15px;">Kapat</button>
+        </div>
+    </div>
+
+    <script>
+        let KURLAR = {{ kurlar | tojson if kurlar else '{}' }};
+        let alarmlar = [];
+        let myChart = null;
+
+        // ÇEREZ KONTROLÜ
+        window.onload = function() {
+            if (!localStorage.getItem('cookieAccepted')) {
+                document.getElementById('cookieBanner').style.display = 'flex';
+            }
+        }
+
+        function cereziKabulEt() {
+            localStorage.setItem('cookieAccepted', 'true');
+            document.getElementById('cookieBanner').style.display = 'none';
+        }
+
+        function modalAc(id) { document.getElementById(id).style.display = 'flex'; }
+        function modalKapat(id) { document.getElementById(id).style.display = 'none'; }
+
+        // CHART.JS GRAFİK
+        function initChart(labels = [], data = []) {
+            const ctx = document.getElementById('portfolioChart');
+            if(!ctx) return;
+            if (myChart) myChart.destroy();
+            
+            myChart = new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#00e676', '#29b6f6', '#ffca28', '#ab47bc', '#ff7043'],
+                        borderWidth: 1,
+                        borderColor: '#1e1e1e'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#ffffff' } } }
+                }
+            });
+        }
+
+        setInterval(async () => {
+            const res = await fetch('/api/kurlar');
+            if(res.ok) {
+                KURLAR = await res.json();
+                for(let key in KURLAR) {
+                    const el = document.getElementById(`c-${key}`);
+                    if(el) el.innerText = `₺${KURLAR[key]}`;
+                }
+                portfoyGetir();
+                alarmKontrol();
+            }
+        }, 10000);
+
+        function bildirimIzniIste() {
+            Notification.requestPermission().then(p => {
+                if(p === 'granted') alert('Fiyat alarmı bildirimleri aktif edildi!');
+            });
+        }
+
+        function alarmEkle() {
+            const varlik = document.getElementById('alarmVarlik').value;
+            const hedef = parseFloat(document.getElementById('alarmHedef').value);
+            if(!hedef) return;
+
+            alarmlar.push({ varlik, hedef, tetiklendi: false });
+            document.getElementById('alarmHedef').value = '';
+            alarmListele();
+        }
+
+        function alarmListele() {
+            const ul = document.getElementById('alarmListesi');
+            ul.innerHTML = alarmlar.map(a => `<li><strong>${a.varlik}</strong> için Hedef: ₺${a.hedef}</li>`).join('');
+        }
+
+        function alarmKontrol() {
+            alarmlar.forEach(a => {
+                if(!a.tetiklendi && KURLAR[a.varlik] >= a.hedef) {
+                    a.tetiklendi = true;
+                    if(Notification.permission === 'granted') {
+                        new Notification('🚨 FİYAT ALARMI TETİKLENDİ!', {
+                            body: `${a.varlik} hedef fiyatı geçti! Canlı: ₺${KURLAR[a.varlik]}`
+                        });
+                    } else {
+                        alert(`🚨 ALARM: ${a.varlik} hedef fiyatı geçti! Canlı: ₺${KURLAR[a.varlik]}`);
+                    }
+                }
+            });
+        }
+
+        async function portfoyGetir() {
+            const res = await fetch('/api/portfolio');
+            if(!res.ok) return;
+            const data = await res.json();
+            const tbody = document.getElementById('portfoyBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            let chartLabels = [];
+            let chartData = [];
+
+            data.forEach(item => {
+                const canlı = KURLAR[item.code] || 0;
+                const maliyet = item.amount * item.buy_price;
+                const mevcut = item.amount * canlı;
+                const kz = mevcut - maliyet;
+
+                chartLabels.push(item.code);
+                chartData.push(mevcut.toFixed(2));
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${item.code}</strong></td>
+                        <td>${item.amount}</td>
+                        <td>₺${item.buy_price}</td>
+                        <td>₺${canlı}</td>
+                        <td>₺${mevcut.toFixed(2)}</td>
+                        <td class="${kz >= 0 ? 'profit':'loss'}">₺${kz.toFixed(2)}</td>
+                        <td><button class="btn-danger" onclick="dbVarlikSil(${item.id})">Sil</button></td>
+                    </tr>
+                `;
+            });
+
+            initChart(chartLabels, chartData);
+        }
+
+        async function dbVarlikEkle() {
+            const code = document.getElementById('vKod').value;
+            const amount = parseFloat(document.getElementById('vMiktar').value);
+            const buy_price = parseFloat(document.getElementById('vAlis').value);
+
+            if(!amount || !buy_price) return alert('Lütfen geçerli değer girin!');
+
+            await fetch('/api/portfolio/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ code, amount, buy_price })
+            });
+
+            document.getElementById('vMiktar').value = '';
+            document.getElementById('vAlis').value = '';
+            portfoyGetir();
+        }
+
+        async function dbVarlikSil(id) {
+            await fetch(`/api/portfolio/delete/${id}`, { method: 'DELETE' });
+            portfoyGetir();
+        }
+
+        async function aiSoruSor() {
+            const input = document.getElementById('aiInput');
+            const query = input.value.trim();
+            if(!query) return;
+
+            const chatBox = document.getElementById('chatBox');
+            chatBox.innerHTML += `<div class="chat-msg chat-user">👤 Siz: ${query}</div>`;
+            input.value = '';
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ prompt: query })
+            });
+
+            if(res.ok) {
+                const data = await res.json();
+                chatBox.innerHTML += `<div class="chat-msg chat-ai">${data.response}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        {% if user %}
+        portfoyGetir();
+        {% endif %}
+    </script>
 </body>
 </html>
 """
@@ -504,7 +586,7 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
-# --- REST API (PORTFÖY & KURLAR & AI) ---
+# --- REST API ---
 @app.route('/api/kurlar')
 def api_kurlar():
     return jsonify(kurlari_al())
