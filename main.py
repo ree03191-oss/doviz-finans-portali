@@ -1,49 +1,47 @@
 from flask import Flask, render_template_string, request, jsonify
-import requests
+import cloudscraper
 
 app = Flask(__name__)
+
+# Cloudscraper nesnesi (Bot engellerini ve Cloudflare duvarını aşar)
+scraper = cloudscraper.create_scraper()
 
 def kurlari_al():
     usd_try = 34.20
     eur_try = 37.50
-    gram_altin = 3050.0  # Varsayılan gerçekçi piyasa yedeği
+    gram_altin = 3050.0  # Varsayılan yedek fiyat
 
-    # 1. CANLI DÖVİZ VERİSİ (ExchangeRate-API)
+    # GERÇEK SERBEST PİYASA / KAPALIÇARŞI KURLARI (Genelpara Canlı Servisi)
     try:
-        doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=4)
-        if doviz_res.status_code == 200:
-            doviz_data = doviz_res.json()
-            usd_try = doviz_data['rates'].get('TRY', usd_try)
-            eur_rate = doviz_data['rates'].get('EUR', 1)
-            eur_try = usd_try / eur_rate if eur_rate else eur_try
-    except Exception as e:
-        print("Döviz API Hatası:", e)
+        res = scraper.get("https://api.genelpara.com/embed/altin.json", timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            
+            # Gram Altın (GA) Gerçek Kapalıçarşı Satış Fiyatı
+            if 'GA' in data and 'satis' in data['GA']:
+                gram_altin = float(data['GA']['satis'].replace('.', '').replace(',', '.'))
+            
+            # Dolar (USD)
+            if 'USD' in data and 'satis' in data['USD']:
+                usd_try = float(data['USD']['satis'].replace('.', '').replace(',', '.'))
 
-    # 2. TÜRKİYE GERÇEK KAPALIÇARŞI / SERBEST PİYASA GRAM ALTIN (Döviz.com Canlı Servisi)
-    altin_basarili = False
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        gold_res = requests.get("https://www.doviz.com/api/v1/golds/gram-altin/archive", headers=headers, timeout=4)
-        if gold_res.status_code == 200:
-            gold_data = gold_res.json()
-            if isinstance(gold_data, list) and len(gold_data) > 0:
-                # Son güncel gerçek satış fiyatı
-                gram_altin = float(gold_data[-1]['selling'])
-                altin_basarili = True
-    except Exception as e:
-        print("Döviz.com Altın API Hatası:", e)
+            # Euro (EUR)
+            if 'EUR' in data and 'satis' in data['EUR']:
+                eur_try = float(data['EUR']['satis'].replace('.', '').replace(',', '.'))
 
-    # Yedek Altın Servisi (Binance Ons -> TL Çevirici + %2 Serbest Piyasa Makası)
-    if not altin_basarili:
+    except Exception as e:
+        print("Genelpara API Hatası (Yedek servise geçiliyor):", e)
+        
+        # YEDEK SERVİS: Open Exchange Rates
         try:
-            binance_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=4)
-            if binance_res.status_code == 200:
-                ons_usdt = float(binance_res.json()['price'])
-                gram_usd = ons_usdt / 31.1034768
-                # Kapalıçarşı primini ekler (~%2.2)
-                gram_altin = (gram_usd * usd_try) * 1.022
-        except Exception as e:
-            print("Yedek Binance Altın Hatası:", e)
+            doviz_res = scraper.get("https://open.er-api.com/v6/latest/USD", timeout=4)
+            if doviz_res.status_code == 200:
+                ddata = doviz_res.json()
+                usd_try = ddata['rates'].get('TRY', usd_try)
+                eur_rate = ddata['rates'].get('EUR', 1)
+                eur_try = usd_try / eur_rate if eur_rate else eur_try
+        except Exception as ex:
+            print("Yedek servis hatası:", ex)
 
     return {
         'USD': round(usd_try, 2),
