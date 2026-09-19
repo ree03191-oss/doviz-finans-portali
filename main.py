@@ -43,6 +43,7 @@ HTML_KODU = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
     <!-- TEMEL SEO ETIKETLERI (Google için) -->
+    <meta name="google-site-verification" content="kwQtL9CdecHzkRTkJ0pAPM-YlvkUs88M-CFZUu6fnXo" />
     <title>Canlı Döviz, Altın Kurları ve Portföy Takip Portalı</title>
     <meta name="description" content="Canlı Dolar, Euro ve 24 Ayar Gram Altın fiyatlarını takip edin. Ücretsiz portföy takip aracı ve yapay zeka finans asistanı ile yatırımlarınızı yönetin.">
     <meta name="keywords" content="canlı döviz, canlı altın, dolar kaç tl, gram altın fiyatı, portföy takip, finans asistanı, kar zarar hesaplama">
