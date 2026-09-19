@@ -41,7 +41,23 @@ HTML_KODU = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Canlı Finans Portalı & Portföy Takibi</title>
+    
+    <!-- TEMEL SEO ETIKETLERI (Google için) -->
+    <title>Canlı Döviz, Altın Kurları ve Portföy Takip Portalı</title>
+    <meta name="description" content="Canlı Dolar, Euro ve 24 Ayar Gram Altın fiyatlarını takip edin. Ücretsiz portföy takip aracı ve yapay zeka finans asistanı ile yatırımlarınızı yönetin.">
+    <meta name="keywords" content="canlı döviz, canlı altın, dolar kaç tl, gram altın fiyatı, portföy takip, finans asistanı, kar zarar hesaplama">
+    <meta name="author" content="Finans Portalı">
+    <meta name="robots" content="index, follow">
+
+    <!-- SOSYAL MEDYA PAYLAŞIM KARTLARI (Open Graph & Twitter) -->
+    <meta property="og:title" content="Canlı Döviz, Altın & Portföy Takip Portalı">
+    <meta property="og:description" content="Canlı piyasa verileri, kişisel portföy hesaplama ve yapay zeka finans asistanı ile yatırımlarınızı anlık takip edin.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Canlı Döviz & Portföy Takip Portalı">
+    <meta name="twitter:description" content="Canlı döviz, altın kurları ve AI Finans Asistanı ile yatırımlarınızı kolayca yönetin.">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
@@ -78,7 +94,7 @@ HTML_KODU = """
         .profit { color: #00e676; }
         .loss { color: #ff5252; }
 
-        /* YAZILIM / AI CHATBOT BALONCUĞU STİLLERİ */
+        /* YAZILIM / AI CHATBOT STİLLERİ */
         .ai-widget-toggle {
             position: fixed; bottom: 25px; right: 25px;
             background: #00e676; color: #121212; border-radius: 50%;
@@ -376,7 +392,7 @@ HTML_KODU = """
             input.value = '';
             messagesBox.scrollTop = messagesBox.scrollHeight;
 
-            // AI Yanıtı İsteyelim
+            // AI Yanıtı
             fetch('/ai_soru', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -414,7 +430,6 @@ def ai_soru():
     portfoy = data.get('portfoy', [])
     kurlar = data.get('kurlar', {})
 
-    # Basit Kural Bazlı AI Finans Mantığı
     if 'portföy' in soru or 'portfoy' in soru or 'durum' in soru:
         if not portfoy:
             cevap = "Şu anda portföyünüzde kayıtlı hiçbir varlık bulunmuyor. Tablodan varlık ekleyerek analizi görebilirsiniz."
