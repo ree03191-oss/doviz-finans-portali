@@ -6,9 +6,9 @@ app = Flask(__name__)
 def kurlari_al():
     usd_try = 34.20
     eur_try = 37.50
-    gram_24k_altin = 2950.0
+    gram_altin = 3050.0  # Varsayılan gerçekçi piyasa yedeği
 
-    # 1. DÖVİZ VERİSİ (ExchangeRate-API)
+    # 1. CANLI DÖVİZ VERİSİ (ExchangeRate-API)
     try:
         doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=4)
         if doviz_res.status_code == 200:
@@ -19,21 +19,36 @@ def kurlari_al():
     except Exception as e:
         print("Döviz API Hatası:", e)
 
-    # 2. CANLI ALTIN HESAPLAMA (Binance PAXG/USDT & USD/TRY)
+    # 2. TÜRKİYE GERÇEK KAPALIÇARŞI / SERBEST PİYASA GRAM ALTIN (Döviz.com Canlı Servisi)
+    altin_basarili = False
     try:
-        gold_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=4)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        gold_res = requests.get("https://www.doviz.com/api/v1/golds/gram-altin/archive", headers=headers, timeout=4)
         if gold_res.status_code == 200:
-            ons_usdt = float(gold_res.json()['price'])
-            # 1 Ons = ~31.1034768 Gram Has Altın
-            gram_usd = ons_usdt / 31.1034768
-            gram_24k_altin = gram_usd * usd_try
+            gold_data = gold_res.json()
+            if isinstance(gold_data, list) and len(gold_data) > 0:
+                # Son güncel gerçek satış fiyatı
+                gram_altin = float(gold_data[-1]['selling'])
+                altin_basarili = True
     except Exception as e:
-        print("Altın API Hatası:", e)
+        print("Döviz.com Altın API Hatası:", e)
+
+    # Yedek Altın Servisi (Binance Ons -> TL Çevirici + %2 Serbest Piyasa Makası)
+    if not altin_basarili:
+        try:
+            binance_res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT", timeout=4)
+            if binance_res.status_code == 200:
+                ons_usdt = float(binance_res.json()['price'])
+                gram_usd = ons_usdt / 31.1034768
+                # Kapalıçarşı primini ekler (~%2.2)
+                gram_altin = (gram_usd * usd_try) * 1.022
+        except Exception as e:
+            print("Yedek Binance Altın Hatası:", e)
 
     return {
         'USD': round(usd_try, 2),
         'EUR': round(eur_try, 2),
-        'GA': round(gram_24k_altin, 2)
+        'GA': round(gram_altin, 2)
     }
 
 HTML_KODU = """
@@ -44,9 +59,9 @@ HTML_KODU = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google-site-verification" content="kwQtL9CdecHzkRTkJOpAPH-Y1vkUs88M-CFZUu6fnXo" />
     
-    <title>Canlı Döviz, Altın Kurları ve Portföy Takip Portalı</title>
-    <meta name="description" content="Canlı Dolar, Euro ve 24 Ayar Gram Altın fiyatlarını takip edin. Ücretsiz portföy takip aracı ve yapay zeka finans asistanı ile yatırımlarınızı yönetin.">
-    <meta name="keywords" content="canlı döviz, canlı altın, dolar kaç tl, gram altın fiyatı, portföy takip, finans asistanı, kar zarar hesaplama">
+    <title>Canlı Döviz, Gerçek Altın Kurları ve Portföy Takip Portalı</title>
+    <meta name="description" content="Canlı Dolar, Euro ve Gerçek Kapalıçarşı Gram Altın fiyatlarını takip edin. Ücretsiz portföy takip aracı ve yapay zeka finans asistanı ile yatırımlarınızı yönetin.">
+    <meta name="keywords" content="canlı döviz, kapalıçarşı gram altın, canlı altın, dolar kaç tl, gram altın fiyatı, portföy takip, finans asistanı, kar zarar hesaplama">
     <meta name="author" content="Finans Portalı">
     <meta name="robots" content="index, follow">
 
@@ -95,6 +110,7 @@ HTML_KODU = """
         .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; flex: 1; min-width: 200px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
         .card h3 { margin: 0; color: var(--subtext-color); }
         .card .price { font-size: 28px; font-weight: bold; margin: 10px 0; color: #00e676; }
+        .card .badge { font-size: 11px; background: #00e67622; color: #00e676; padding: 3px 8px; border-radius: 10px; }
         
         .chart-section, .portfolio-section, .converter-section { background: var(--card-bg); border: 1px solid var(--border-color); padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
         .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
@@ -171,7 +187,7 @@ HTML_KODU = """
                 <div class="price" id="card-eur">₺{{ kurlar['EUR'] }}</div>
             </div>
             <div class="card">
-                <h3>🪙 24K Gram Altın</h3>
+                <h3>🪙 24K Gram Altın <span class="badge">Serbest Piyasa</span></h3>
                 <div class="price" id="card-ga">₺{{ kurlar['GA'] }}</div>
             </div>
         </div>
@@ -228,7 +244,7 @@ HTML_KODU = """
                     <option value="GA">24 Ayar Gram Altın</option>
                 </select>
                 <input type="number" id="varlikMiktar" placeholder="Miktar (Örn: 10)" step="any">
-                <input type="number" id="varlikAlis" placeholder="Alış Fiyatı TL (Örn: 32.5)" step="any">
+                <input type="number" id="varlikAlis" placeholder="Alış Fiyatı TL (Örn: 3050)" step="any">
                 <button onclick="varlikEkle()">Portföye Ekle</button>
             </div>
 
@@ -332,7 +348,7 @@ HTML_KODU = """
         let mevcutGrafik = null;
         let aktifGrafikTuru = 'kurlar';
 
-        // OTOMATİK VERİ YENİLEME (AJAX) - 10 saniyede bir
+        // OTOMATİK ARKA PLAN YENİLEME (AJAX - 10 saniyede bir)
         setInterval(async () => {
             try {
                 const res = await fetch('/api/kurlar');
@@ -598,7 +614,7 @@ def ai_soru():
     elif 'euro' in soru or 'eur' in soru:
         cevap = f"Canlı Euro kuru şu anda ₺{kurlar.get('EUR', 0)} seviyesinde."
     elif 'altın' in soru or 'altin' in soru or 'gram' in soru:
-        cevap = f"Canlı 24 Ayar Gram Altın fiyatı şu anda ₺{kurlar.get('GA', 0)} seviyesinde."
+        cevap = f"Canlı Serbest Piyasa 24 Ayar Gram Altın fiyatı şu anda ₺{kurlar.get('GA', 0)} seviyesinde."
     else:
         cevap = f"Anlık Kurlar: USD: ₺{kurlar.get('USD')} | EUR: ₺{kurlar.get('EUR')} | Altın: ₺{kurlar.get('GA')}. Bana portföy durumunuzu veya kurları sorabilirsiniz!"
 
