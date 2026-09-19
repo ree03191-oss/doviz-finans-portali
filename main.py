@@ -6,7 +6,7 @@ app = Flask(__name__)
 def kurlari_al():
     usd_try = 34.20
     eur_try = 37.50
-    gram_altin = 3050.0
+    gram_24k_altin = 3050.0
 
     # 1. Döviz Kurlarını Çek
     try:
@@ -19,19 +19,19 @@ def kurlari_al():
     except Exception as e:
         print("Döviz API Hatası:", e)
 
-    # 2. Gram Altın Kuru Çek
+    # 2. 24 Ayar Gram Altın Kuru Çek (GA = 24 Ayar Saf Gram Altın)
     try:
         altin_res = requests.get("https://api.genelpara.com/embed/altin.json", timeout=5)
         if altin_res.status_code == 200:
             altin_data = altin_res.json()
-            gram_altin = float(altin_data['GA']['satis'].replace(',', '.'))
+            gram_24k_altin = float(altin_data['GA']['satis'].replace(',', '.'))
     except Exception as e:
         print("Altın API Hatası:", e)
 
     return {
         'USD': round(usd_try, 2),
         'EUR': round(eur_try, 2),
-        'GA': round(gram_altin, 2)
+        'GA': round(gram_24k_altin, 2)
     }
 
 HTML_KODU = """
@@ -75,7 +75,7 @@ HTML_KODU = """
                 <div class="price">₺{{ kurlar['EUR'] }}</div>
             </div>
             <div class="card">
-                <h3>🪙 Gram Altın</h3>
+                <h3>🪙 24 Ayar Gram Altın</h3>
                 <div class="price">₺{{ kurlar['GA'] }}</div>
             </div>
         </div>
@@ -88,9 +88,9 @@ HTML_KODU = """
                     <select name="varlik">
                         <option value="USD">Dolar (USD)</option>
                         <option value="EUR">Euro (EUR)</option>
-                        <option value="GA">Gram Altın</option>
+                        <option value="GA">24 Ayar Gram Altın</option>
                     </select>
-                    <input type="number" step="any" name="miktar" placeholder="Miktar (Örn: 100)" required>
+                    <input type="number" step="any" name="miktar" placeholder="Miktar (Örn: 10)" required>
                     <input type="number" step="any" name="alis_fiyati" placeholder="Alış Fiyatın (TL)" required>
                     <button type="submit">Hesapla</button>
                 </div>
@@ -131,7 +131,7 @@ def ana_sayfa():
         kar_zarar = toplam_mevcut - toplam_maliyet
         yuzde = (kar_zarar / toplam_maliyet * 100) if toplam_maliyet > 0 else 0
 
-        varlik_adlari = {'USD': 'Dolar', 'EUR': 'Euro', 'GA': 'Gram Altın'}
+        varlik_adlari = {'USD': 'Dolar', 'EUR': 'Euro', 'GA': '24 Ayar Gram Altın'}
 
         hesaplama = {
             'varlik_adi': varlik_adlari.get(varlik, varlik),
