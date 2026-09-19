@@ -43,9 +43,6 @@ from bs4 import BeautifulSoup
 
 def kurlari_al():
     # Varsayılan değerler
-    usd_try, eur_try, gram_altin = 34.20, 37.50, 3050.0
-    btc_usd, eth_usd = 65000.0, 3500.0
-
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     }
