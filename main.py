@@ -4,33 +4,35 @@ import requests
 app = Flask(__name__)
 
 def kurlari_al():
-    try:
-        # Döviz kurlarını çekiyoruz (Ücretsiz ve hızlı API)
-        doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
-        doviz_data = doviz_res.json()
-        
-        usd_try = doviz_data['rates']['TRY']
-        eur_usd = doviz_data['rates']['EUR']
-        eur_try = usd_try / eur_usd
+    usd_try = 34.20
+    eur_try = 37.50
+    gram_altin = 3050.0
 
-        # Altın fiyatını Ons üzerinden hesaplıyoruz veya genel kaynak çekiyoruz
-        try:
-            altin_res = requests.get("https://api.genelpara.com/embed/altin.json", timeout=5)
+    # 1. Döviz Kurlarını Çek
+    try:
+        doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
+        if doviz_res.status_code == 200:
+            doviz_data = doviz_res.json()
+            usd_try = doviz_data['rates']['TRY']
+            eur_usd = doviz_data['rates']['EUR']
+            eur_try = usd_try / eur_usd
+    except Exception as e:
+        print("Döviz API Hatası:", e)
+
+    # 2. Gram Altın Kuru Çek
+    try:
+        altin_res = requests.get("https://api.genelpara.com/embed/altin.json", timeout=5)
+        if altin_res.status_code == 200:
             altin_data = altin_res.json()
             gram_altin = float(altin_data['GA']['satis'].replace(',', '.'))
-        except:
-            # AlternatifOns altın hesabı (1 Ons = 31.1035 gram)
-            ons_usd = 2650.0  # Yaklaşık Ons
-            gram_altin = (ons_usd / 31.1035) * usd_try
-
-        return {
-            'USD': round(usd_try, 2),
-            'EUR': round(eur_try, 2),
-            'GA': round(gram_altin, 2)
-        }
     except Exception as e:
-        # Bağlantı koparsa bile daha gerçekçi yedek değerler
-        return {'USD': 48.70, 'EUR': 52.50, 'GA': 4100.0}
+        print("Altın API Hatası:", e)
+
+    return {
+        'USD': round(usd_try, 2),
+        'EUR': round(eur_try, 2),
+        'GA': round(gram_altin, 2)
+    }
 
 HTML_KODU = """
 <!DOCTYPE html>
@@ -38,7 +40,7 @@ HTML_KODU = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finans Portalı & Portföy Takibi</title>
+    <title>Canlı Finans Portalı & Portföy Takibi</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; }
