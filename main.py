@@ -6,10 +6,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 from xhtml2pdf import pisa  # PDF Oluşturucu
 
-# OpenAI Entegrasyonu
+# OpenAI Entegrasyonu (İsteğe Bağlı)
 try:
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"))
+    client = OpenAI(api_key=os.environ.get("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", "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"))
 except ImportError:
     client = None
 
@@ -100,7 +100,6 @@ def kurlari_al():
     }
 
 def haberleri_al():
-    # Finansal simülasyon haberleri
     return [
         {"title": "Merkez Bankaları Faiz Kararlarını Açıklamaya Hazırlanıyor", "time": "10 dk önce"},
         {"title": "Bitcoin 65.000$ Direncini Test Ediyor", "time": "30 dk önce"},
@@ -499,7 +498,7 @@ def login():
             session['user_id'] = cursor.lastrowid
         except sqlite3.IntegrityError:
             conn.close()
-            return render_template_string(HTML_TEMPLATE, err="Kullanıcı adı alınmış!")
+            return render_template_string(HTML_TEMPLATE, err="Kullanıcı adı alınmış!", kurlar=kurlari_al(), haberler=haberleri_al())
     else:
         cursor.execute("SELECT id, password FROM users WHERE username = ?", (username,))
         row = cursor.fetchone()
@@ -508,7 +507,7 @@ def login():
             session['user_id'] = row[0]
         else:
             conn.close()
-            return render_template_string(HTML_TEMPLATE, err="Hatalı kullanıcı adı veya şifre!")
+            return render_template_string(HTML_TEMPLATE, err="Hatalı kullanıcı adı veya şifre!", kurlar=kurlari_al(), haberler=haberleri_al())
 
     conn.close()
     return redirect(url_for('index'))
@@ -574,22 +573,41 @@ def ai_chat():
     response_text = ai_analiz_ureti(data.get('prompt', ''), session['user_id'])
     return jsonify({'response': response_text})
 
-# --- PDF INDIRME SERVISI ---
+# --- PDF İNDİRME SERVİSİ ---
 @app.route('/download/pdf')
 def download_pdf():
     if 'user_id' not in session: return redirect(url_for('index'))
     
-    kurlar = kurlari_al()
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute("SELECT asset_code, amount, buy_price FROM portfolio WHERE user_id = ?", (session['user_id'],))
     rows = cursor.fetchall()
     conn.close()
 
-    html_content = f"<h1>Finans Portalı - Portföy Raporu</h1><p>Kullanıcı: {session['user']}</p><table border='1' cellpadding='5'><tr><th>Varlık</th><th>Miktar</th><th>Alış Fiyatı</th></tr>"
+    html_content = f"""
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Helvetica, sans-serif; }}
+            h1 {{ color: #00e676; }}
+            table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+            th, td {{ border: 1px solid #333; padding: 8px; text-align: left; }}
+            th {{ background-color: #f0f0f0; }}
+        </style>
+    </head>
+    <body>
+        <h1>Finans Portalı - Portföy Raporu</h1>
+        <p><b>Kullanıcı:</b> {session['user']}</p>
+        <table>
+            <tr><th>Varlık</th><th>Miktar</th><th>Alış Fiyatı (TL)</th></tr>
+    """
     for r in rows:
         html_content += f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>₺{r[2]}</td></tr>"
-    html_content += "</table>"
+    
+    if not rows:
+        html_content += "<tr><td colspan='3'>Henüz kayıtlı varlık bulunmamaktadır.</td></tr>"
+
+    html_content += "</table></body></html>"
 
     pdf_buffer = io.BytesIO()
     pisa.CreatePDF(io.StringIO(html_content), dest=pdf_buffer)
