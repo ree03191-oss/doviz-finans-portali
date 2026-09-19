@@ -2,7 +2,6 @@ import sqlite3
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
-from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 app.secret_key = 'finans_gizli_anahtar_key_2026'
@@ -39,50 +38,46 @@ def init_db():
 
 init_db()
 
-# --- GÜNCELLENMİŞ CANLI KUR SERVİSİ (SCRAPER + YEDEK API) ---
+# --- GÜNCELLENMİŞ CANLI KUR SERVİSİ (KESİNTİSİZ JSON API) ---
 def kurlari_al():
-    # Varsayılan değerler
+    # Varsayılan (Yedek) Değerler
     usd_try, eur_try, gram_altin = 34.20, 37.50, 3050.0
     btc_usd, eth_usd = 65000.0, 3500.0
 
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     }
 
-    # 1. DÖVİZ VE GRAM ALTIN (Döviz.com HTML Kazıma)
+    # 1. DÖVİZ VE GRAM ALTIN (Açık ve Güvenilir JSON API)
     try:
-        response = requests.get("https://www.doviz.com/", headers=headers, timeout=5)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Dolar
-            usd_elem = soup.find('span', {'data-socket-key': 'USD'})
-            if usd_elem:
-                usd_try = float(usd_elem.text.strip().replace('.', '').replace(',', '.'))
-
-            # Euro
-            eur_elem = soup.find('span', {'data-socket-key': 'EUR'})
-            if eur_elem:
-                eur_try = float(eur_elem.text.strip().replace('.', '').replace(',', '.'))
-
+        res = requests.get("https://finans.truncgil.com/today.json", headers=headers, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            
+            # USD
+            if 'USD' in data and 'Satış' in data['USD']:
+                usd_try = float(data['USD']['Satış'].replace('.', '').replace(',', '.'))
+            
+            # EUR
+            if 'EUR' in data and 'Satış' in data['EUR']:
+                eur_try = float(data['EUR']['Satış'].replace('.', '').replace(',', '.'))
+                
             # Gram Altın
-            ga_elem = soup.find('span', {'data-socket-key': 'gram-altin'})
-            if ga_elem:
-                gram_altin = float(ga_elem.text.strip().replace('.', '').replace(',', '.'))
+            if 'gram-altin' in data and 'Satış' in data['gram-altin']:
+                gram_altin = float(data['gram-altin']['Satış'].replace('.', '').replace(',', '.'))
         else:
-            # Döviz.com engeline takılırsa yedek JSON API devreye girer
-            res = requests.get("https://api.genelpara.com/embed/doviz.json", headers=headers, timeout=3)
-            altin_res = requests.get("https://api.genelpara.com/embed/altin.json", headers=headers, timeout=3)
-            if res.status_code == 200:
-                d_data = res.json()
-                usd_try = float(d_data['USD']['satis'])
-                eur_try = float(d_data['EUR']['satis'])
-            if altin_res.status_code == 200:
-                a_data = altin_res.json()
-                gram_altin = float(a_data['GA']['satis'])
+            # Yedek Servis: ExchangeRate-API (Sadece Dolar/Euro için)
+            ex_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=3)
+            if ex_res.status_code == 200:
+                rates = ex_res.json().get('rates', {})
+                try_rate = rates.get('TRY', 34.20)
+                eur_rate = rates.get('EUR', 0.92)
+                
+                usd_try = try_rate
+                eur_try = try_rate / eur_rate if eur_rate else 37.50
 
     except Exception as e:
-        print(f"Döviz/Altın Hatası: {e}")
+        print(f"Döviz/Altın Çekme Hatası: {e}")
 
     # 2. KRİPTO PARALAR (Binance Resmi API)
     try:
@@ -94,7 +89,7 @@ def kurlari_al():
         if eth_res.status_code == 200:
             eth_usd = float(eth_res.json()['price'])
     except Exception as e:
-        print(f"Kripto Hatası: {e}")
+        print(f"Kripto Çekme Hatası: {e}")
 
     return {
         'USD': round(usd_try, 2),
