@@ -5,26 +5,32 @@ app = Flask(__name__)
 
 def kurlari_al():
     try:
-        # Piyasa canlı kurlarını çeken API
-        response = requests.get("https://api.genelpara.com/embed/doviz.json")
-        data = response.json()
+        # Döviz kurlarını çekiyoruz (Ücretsiz ve hızlı API)
+        doviz_res = requests.get("https://open.er-api.com/v6/latest/USD", timeout=5)
+        doviz_data = doviz_res.json()
         
-        # Altın verilerini de alalım
-        gold_response = requests.get("https://api.genelpara.com/embed/altin.json")
-        gold_data = gold_response.json()
+        usd_try = doviz_data['rates']['TRY']
+        eur_usd = doviz_data['rates']['EUR']
+        eur_try = usd_try / eur_usd
 
-        dolar = float(data['USD']['satis'].replace(',', '.'))
-        euro = float(data['EUR']['satis'].replace(',', '.'))
-        altin = float(gold_data['GA']['satis'].replace(',', '.'))
+        # Altın fiyatını Ons üzerinden hesaplıyoruz veya genel kaynak çekiyoruz
+        try:
+            altin_res = requests.get("https://api.genelpara.com/embed/altin.json", timeout=5)
+            altin_data = altin_res.json()
+            gram_altin = float(altin_data['GA']['satis'].replace(',', '.'))
+        except:
+            # AlternatifOns altın hesabı (1 Ons = 31.1035 gram)
+            ons_usd = 2650.0  # Yaklaşık Ons
+            gram_altin = (ons_usd / 31.1035) * usd_try
 
         return {
-            'USD': dolar,
-            'EUR': euro,
-            'GA': altin
+            'USD': round(usd_try, 2),
+            'EUR': round(eur_try, 2),
+            'GA': round(gram_altin, 2)
         }
     except Exception as e:
-        # Herhangi bir hata durumunda varsayılan kurlar
-        return {'USD': 34.20, 'EUR': 37.50, 'GA': 2850.0}
+        # Bağlantı koparsa bile daha gerçekçi yedek değerler
+        return {'USD': 48.70, 'EUR': 52.50, 'GA': 4100.0}
 
 HTML_KODU = """
 <!DOCTYPE html>
@@ -32,8 +38,7 @@ HTML_KODU = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finans Portal & Portföy Takibi</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Finans Portalı & Portföy Takibi</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #121212; color: #ffffff; margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; }
@@ -55,7 +60,7 @@ HTML_KODU = """
 </head>
 <body>
     <div class="container">
-        <h1>📊 Finans Portalı & Portföy Takibi</h1>
+        <h1>📊 Canlı Finans Portalı & Portföy Takibi</h1>
         
         <!-- Canlı Kurlar -->
         <div class="cards">
