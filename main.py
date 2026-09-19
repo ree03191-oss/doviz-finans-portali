@@ -4,9 +4,10 @@ import requests
 app = Flask(__name__)
 
 def kurlari_al():
+    # Varsayılan güncel piyasa değerleri (API erişilemezse devreye girer)
     usd_try = 34.20
     eur_try = 37.50
-    gram_24k_altin = 3050.0
+    gram_24k_altin = 6870.0
 
     # 1. Döviz Kurlarını Çek
     try:
@@ -19,12 +20,18 @@ def kurlari_al():
     except Exception as e:
         print("Döviz API Hatası:", e)
 
-    # 2. 24 Ayar Gram Altın Kuru Çek (GA = 24 Ayar Saf Gram Altın)
+    # 2. 24 Ayar Canlı Gram Altın Kuru Çek (Engelsiz Açık API)
     try:
-        altin_res = requests.get("https://api.genelpara.com/embed/altin.json", timeout=5)
-        if altin_res.status_code == 200:
-            altin_data = altin_res.json()
-            gram_24k_altin = float(altin_data['GA']['satis'].replace(',', '.'))
+        altin_res = requests.get("https://api.collectapi.com/economy/goldPrice", headers={
+            'content-type': "application/json"
+        }, timeout=5)
+        
+        # Alternatif açık kaynak:
+        altin_res2 = requests.get("https://finans.truncgil.com/v3/today.json", timeout=5)
+        if altin_res2.status_code == 200:
+            altin_data = altin_res2.json()
+            if 'Gram Altın' in altin_data:
+                gram_24k_altin = float(altin_data['Gram Altın']['Selling'].replace(',', '.'))
     except Exception as e:
         print("Altın API Hatası:", e)
 
@@ -146,3 +153,4 @@ def ana_sayfa():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
