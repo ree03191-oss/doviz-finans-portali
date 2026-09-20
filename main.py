@@ -214,6 +214,7 @@ HTML_TEMPLATE = """
             <h2 style="color:#00e676; text-align:center;">🔐 Finans Portalı</h2>
             {% if err %}<p style="color:#ff5252; text-align:center;">{{ err }}</p>{% endif %}
             <form method="POST" action="/login">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                 <div style="display:flex; flex-direction:column; gap:12px;">
                     <input type="text" name="username" placeholder="Kullanıcı Adı" required>
                     <input type="password" name="password" placeholder="Şifre" required>
