@@ -15,7 +15,7 @@ app.config['SECRET_KEY'] = 'xxsd45rrt092545expertuuiklop'
 csrf = CSRFProtect(app)
 
 # GERÇEK HABER API KEY (NewsAPI - https://newsapi.org adresinden ücretsiz alabilirsiniz)
-NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "YOUR_NEWS_API_KEY")
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "dc310b4eceac490d8fa875cbb4e914a0")
 
 # OpenAI Entegrasyonu (İsteğe Bağlı)
 try:
