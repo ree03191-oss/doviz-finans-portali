@@ -2,6 +2,7 @@ import sqlite3
 import os
 import io
 import requests
+from datetime import datetime
 from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, make_response
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -13,6 +14,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'xxsd45rrt092545expertuuiklop'
 csrf = CSRFProtect(app)
 
+# GERÇEK HABER API KEY (NewsAPI - https://newsapi.org adresinden ücretsiz alabilirsiniz)
+NEWS_API_KEY = os.environ.get("NEWS_API_KEY", "YOUR_NEWS_API_KEY")
+
 # OpenAI Entegrasyonu (İsteğe Bağlı)
 try:
     from openai import OpenAI
@@ -21,6 +25,7 @@ except ImportError:
     client = None
 
 DB_NAME = 'finans.db'
+
 # --- VERİTABANI KURULUMU ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -64,7 +69,7 @@ def init_db():
 
 init_db()
 
-# --- CANLI KUR VE HABER SERVİSİ ---
+# --- CANLI KUR SERVİSİ ---
 def kurlari_al():
     usd_try, eur_try, gram_altin = 34.20, 37.50, 3050.0
     btc_usd, eth_usd = 65000.0, 3500.0
@@ -103,12 +108,44 @@ def kurlari_al():
         'ETH': round(eth_usd * usd_try, 2)
     }
 
+# --- GERÇEK ANLIK HABER SERVİSİ (NewsAPI) ---
 def haberleri_al():
-    return [
-        {"title": "Merkez Bankaları Faiz Kararlarını Açıklamaya Hazırlanıyor", "time": "10 dk önce"},
-        {"title": "Bitcoin 65.000$ Direncini Test Ediyor", "time": "30 dk önce"},
-        {"title": "Altın Fiyatlarında Küresel Piyasa Hareketliliği", "time": "1 saat önce"}
-    ]
+    haberler = []
+    if NEWS_API_KEY and NEWS_API_KEY != "YOUR_NEWS_API_KEY":
+        try:
+            # Türkiye kaynaklı finans/ekonomi haberlerini çeker
+            url = f"https://newsapi.org/v2/top-headlines?country=tr&category=business&pageSize=5&apiKey={NEWS_API_KEY}"
+            res = requests.get(url, timeout=4)
+            if res.status_code == 200:
+                articles = res.json().get('articles', [])
+                for art in articles:
+                    # Tarih formatlama (Ör: 14:30)
+                    published_at = art.get('publishedAt', '')
+                    time_str = "Akitf"
+                    if published_at:
+                        try:
+                            dt = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
+                            time_str = dt.strftime("%H:%M")
+                        except Exception:
+                            time_str = "Bugün"
+
+                    haberler.append({
+                        "title": art.get('title', 'Finans Gelişmesi'),
+                        "time": f"{time_str} - {art.get('source', {}).get('name', 'Finans')}",
+                        "url": art.get('url', '#')
+                    })
+        except Exception as e:
+            print(f"Haber API Hatası: {e}")
+
+    # API anahtarı girilmemişse veya hata alındıysa yedek haberler gösterilir
+    if not haberler:
+        haberler = [
+            {"title": "Piyasalarda Son Durum: Döviz ve Altın Fiyatları", "time": "Canlı", "url": "#"},
+            {"title": "Kripto Para Piyasalarında Hareketlilik Sürüyor", "time": "Güncel", "url": "#"},
+            {"title": "Borsa İstanbul Günü Artıda Kapattı", "time": "Bugün", "url": "#"}
+        ]
+        
+    return haberler
 
 # --- AI ANALİZ MOTORU ---
 def ai_analiz_ureti(user_prompt, user_id):
@@ -137,7 +174,7 @@ def ai_analiz_ureti(user_prompt, user_id):
     Soruya doğrudan, mantıklı ve finansal açıdan objektif yanıt ver.
     """
 
-    if client and os.environ.get("OPENAI_API_KEY") and os.environ.get("OPENAI_API_KEY") != "YOUR_OPENAI_API_KEY":
+    if client and os.environ.get("OPENAI_API_KEY") and os.environ.get("OPENAI_API_KEY") != "GECICI_KEY":
         try:
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -203,8 +240,10 @@ HTML_TEMPLATE = """
         .chat-user { color: #29b6f6; font-weight: bold; }
         .chat-ai { color: #00e676; }
 
+        .news-link { color: var(--text-color); text-decoration: none; font-size: 14px; font-weight: bold; }
+        .news-link:hover { color: #00e676; }
+
         footer { text-align: center; font-size: 12px; color: var(--subtext-color); margin-top: 30px; }
-        footer a { color: #00e676; text-decoration: none; margin: 0 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -311,8 +350,10 @@ HTML_TEMPLATE = """
                 <div id="haberAkisi">
                     {% for haber in haberler %}
                     <div style="border-bottom: 1px solid var(--border-color); padding: 8px 0;">
-                        <div style="font-size:14px; font-weight:bold;">{{ haber.title }}</div>
-                        <div style="font-size:11px; color:var(--subtext-color);">{{ haber.time }}</div>
+                        <div>
+                            <a href="{{ haber.url }}" target="_blank" class="news-link">{{ haber.title }}</a>
+                        </div>
+                        <div style="font-size:11px; color:var(--subtext-color); margin-top:3px;">{{ haber.time }}</div>
                     </div>
                     {% endfor %}
                 </div>
@@ -486,6 +527,7 @@ def index():
     return render_template_string(HTML_TEMPLATE, user=user, kurlar=kurlar, haberler=haberler)
 
 @app.route('/login', methods=['POST'])
+@csrf.exempt
 def login():
     username = request.form.get('username')
     password = request.form.get('password')
