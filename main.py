@@ -1,22 +1,26 @@
 import sqlite3
 import os
 import io
-from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, make_response
-from werkzeug.security import generate_password_hash, check_password_hash
 import requests
-from xhtml2pdf import pisa  # PDF Oluşturucu
+from flask import Flask, render_template_string, request, jsonify, session, redirect, url_for, make_response
+from flask_wtf.csrf import CSRFProtect
+from werkzeug.security import generate_password_hash, check_password_hash
+from xhtml2pdf import pisa
+
+app = Flask(__name__)
+
+# CSRF ve Session Gizli Anahtarı
+app.config['SECRET_KEY'] = 'xxsd45rrt092545expertuuiklop'
+csrf = CSRFProtect(app)
 
 # OpenAI Entegrasyonu (İsteğe Bağlı)
 try:
     from openai import OpenAI
-    client = OpenAI(api_key=os.environ.get("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", "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"))
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "GECICI_KEY"))
 except ImportError:
     client = None
 
-app = Flask(__name__)
-app.secret_key = 'finans_gizli_anahtar_key_2026'
 DB_NAME = 'finans.db'
-
 # --- VERİTABANI KURULUMU ---
 def init_db():
     conn = sqlite3.connect(DB_NAME)

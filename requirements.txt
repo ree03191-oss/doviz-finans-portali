@@ -3,3 +3,4 @@ requests
 gunicorn
 xhtml2pdf
 openai
+Flask-WTF
